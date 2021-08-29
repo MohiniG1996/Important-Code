@@ -1,0 +1,88 @@
+public class DCEAddAssetSubscribeHelper    {
+    
+    public static List<DCEEntitlementRequestWrapper> getAssetInWrapper(List<AddAssetNotify__e> addAssetEventList){
+        List<DCEEntitlementRequestWrapper> dceReqWrapperList=new List<DCEEntitlementRequestWrapper>();
+        DCEEntitlementRequestWrapper dceReqWrapper;
+        for(AddAssetNotify__e addAsset : addAssetEventList){ 
+            dceReqWrapper=new DCEEntitlementRequestWrapper();
+            dceReqWrapper.productNumber=addAsset.ProductNumber__c;
+            dceReqWrapper.serialNumber = addAsset.SerialNumber__c;
+        	dceReqWrapperList.add(dceReqWrapper);
+        }
+        return dceReqWrapperList;
+    }
+ 
+       public static List<Integer> calculateBatchSize(Integer eventMessageSize,Integer splitSize){
+        List<Integer> batchSize=new List<Integer>();
+        while(eventMessageSize> splitSize){
+            eventMessageSize=eventMessageSize-splitSize;
+            batchSize.add(splitSize);
+        }
+        batchSize.add(eventMessageSize);
+        return batchSize;
+    }
+    public static List<List<AddAssetNotify__e>> splitBatch(List<AddAssetNotify__e> addAssetEventList,Integer splitSize){
+        List<Integer> batchSizeList=new List<Integer>();
+        Integer eventMessageSize=addAssetEventList.size();
+        System.debug('eventMessageSize==>'+eventMessageSize);
+        List<List<AddAssetNotify__e>> result = new List<List<AddAssetNotify__e>>();
+        List<AddAssetNotify__e> temporaryList = new List<AddAssetNotify__e>();
+        Integer index = 0;
+        Integer count = 0;
+        
+        if(eventMessageSize<splitSize){
+            result.add(addAssetEventList);
+            return result;
+        }else{
+			System.debug('eventMessageSize==>'+eventMessageSize);
+            batchSizeList = calculateBatchSize(eventMessageSize,splitSize);
+            System.debug('batchSizeList==>'+batchSizeList);
+            Integer batchSize=batchSizeList[0];
+            integer batchIndex=0;
+            integer firstIndex=0;
+            integer lastIndex;
+                while(index < eventMessageSize){
+                    temporaryList.add(addAssetEventList.get(index) );
+                    index++;
+                    count++;
+                    if(count == batchSize){
+                        if(batchIndex<batchSizeList.size()-1){
+                            System.debug('batch Count==>'+count);
+                            result.add( new List<AddAssetNotify__e>(temporaryList) );
+                            temporaryList = new List<AddAssetNotify__e>();
+							batchIndex++;
+                            System.debug('bIndex==>'+batchIndex);
+                            batchSize=batchSizeList[batchIndex];
+                            System.debug('bSize==>'+batchSize);
+							count = 0;
+                        }
+                    }
+                }
+            if(!temporaryList.isEmpty()){
+                result.add(temporaryList);
+            }
+        }   
+        return result;
+    }
+        public static void addAssetInBatches(List<AddAssetNotify__e> addAssetEventList){
+            Integer splitSize=50;
+            DCEAddAssetService FirstAssetService;
+            DCEAddAssetService currentAssetService;
+            DCEAddAssetService priorAssetBatchService;
+            List< List<AddAssetNotify__e>> eventMessageList=DCEAddAssetSubscribeHelper.splitBatch(addAssetEventList,splitSize);
+            for(List<AddAssetNotify__e> assetList:eventMessageList){
+                List<DCEEntitlementRequestWrapper> reqWrapperList=DCEAddAssetSubscribeHelper.getAssetInWrapper(assetList);
+                currentAssetService=new DCEAddAssetService(reqWrapperList);
+                if(FirstAssetService==null){
+                    FirstAssetService=currentAssetService;
+                }
+                if(priorAssetBatchService!=null){
+                    priorAssetBatchService.setNextAssetBatch(currentAssetService);
+                }
+                priorAssetBatchService=currentAssetService;
+            }
+            System.enqueueJob(new DCEAddAssetSubscribeEventQueueable(FirstAssetService,FirstAssetService.dceReqWrapperList));  
+            
+    }
+
+}

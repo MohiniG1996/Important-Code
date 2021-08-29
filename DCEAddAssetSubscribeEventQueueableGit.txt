@@ -1,0 +1,37 @@
+public class DCEAddAssetSubscribeEventQueueable implements Queueable,Database.AllowsCallouts,Finalizer {	
+    public List<DCEEntitlementRequestWrapper> dceEntWrapperList ;
+    public DCEAddAssetService addAssetService;
+    
+    
+    public DCEAddAssetSubscribeEventQueueable(List<DCEEntitlementRequestWrapper> dceEntWrapperList) {
+        this.dceEntWrapperList = dceEntWrapperList;
+    }
+	public DCEAddAssetSubscribeEventQueueable(DCEAddAssetService addAssetService) {
+        this.addAssetService = addAssetService;
+    }
+
+   public DCEAddAssetSubscribeEventQueueable(DCEAddAssetService addAssetService,List<DCEEntitlementRequestWrapper> dceEntWrapperList) {
+        this.dceEntWrapperList = dceEntWrapperList;
+        this.addAssetService=addAssetService;
+    }
+     
+	public void execute(QueueableContext context)
+    {
+        //DCEAddAssetService.addAsset(dceEntWrapperList);
+		Finalizer finalizer = new DCEAddAssetSubscribeEventQueueable(addAssetService);
+    	System.attachFinalizer(finalizer);
+    }
+   public void execute(FinalizerContext context) {
+       String parentJobId = '' + context.getAsyncApexJobId();
+       String newJobId;
+       System.debug('Begin: executing finalizer attached to queueable job: ' + parentJobId);
+       DCEAddAssetService nextBatch = addAssetService.getNextAssetBatch();       
+       if(nextBatch != null){
+           newJobId = '' +System.enqueueJob(new DCEAddAssetSubscribeEventQueueable(nextBatch,nextBatch.dceReqWrapperList));
+           System.debug('Enqueued first step job with next EntitlementMovingService object, Id: ' + newJobId + ' + class: moveentitlementQueueable');
+       } else {
+           System.debug('no more moving service to run');
+       }
+    }
+    
+}

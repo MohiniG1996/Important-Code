@@ -1,0 +1,33 @@
+public class DCEAddAssetService {
+    public List<DCEEntitlementRequestWrapper> dceReqWrapperList;
+    public DCEAddAssetService nextAssetBatch;
+    public Integer numberOfBatches;
+    public DCEAddAssetService(){
+        
+    }
+    public DCEAddAssetService(List<DCEEntitlementRequestWrapper> reqWrapperList){
+        this.dceReqWrapperList=reqWrapperList;
+    }
+    public DCEAddAssetService(List<DCEEntitlementRequestWrapper> reqList,Integer numberOfBatches){
+        this.dceReqWrapperList=reqList;
+        this.numberOfBatches=numberOfBatches;
+    }
+    public DCEAddAssetService getNextAssetBatch(){
+        System.debug('nextAssetBatch'+this.nextAssetBatch);
+        return this.nextAssetBatch;
+
+    }
+    public void setNextAssetBatch(DCEAddAssetService assetService){
+        this.nextAssetBatch=assetService;
+    }
+    public static boolean addAsset(List<DCEEntitlementRequestWrapper> reqWrapperRecList){
+        for(DCEEntitlementRequestWrapper reqWrapperRec:reqWrapperRecList){
+            DCEEntitlementRequestWrapper dceReqWrapper = DCEAssetAddManager.validateAssetSn(reqWrapperRec);
+            DCEEntitlementRequestWrapper addAssetRes = DCEAssetAddManager.addAsset(reqWrapperRec);
+            if(Integer.valueOf(addAssetRes.message)==7){
+                return true;
+            }
+        }
+        return false;
+    }
+}
